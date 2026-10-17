@@ -1,13 +1,10 @@
 # Taller guiado · hoja de ruta
 
-Solo los pasos, en orden, con lo que debería salir en cada uno. **40 minutos.**
-
-- Si algo no funciona → [README.md](README.md), sección *Si algo falla*.
 - Consola: **http://localhost:8081/console** · secret: **`taller123`**
 
 ---
 
-## Paso 0 · Arrancar · 2 min
+## Paso 0 · Arrancar 
 
 En la carpeta del taller:
 
@@ -28,7 +25,7 @@ Entra a **http://localhost:8081/console** con el secret `taller123`.
 
 ---
 
-## Paso 2 · Mostrar lo único que escribimos · 1 min
+## Paso 2 · Mostrar lo único que escribimos 
 
 Abre [sql/01-schema.sql](sql/01-schema.sql).
 
@@ -37,7 +34,7 @@ Abre [sql/01-schema.sql](sql/01-schema.sql).
 
 ---
 
-## Paso 3 · Generar la API · 3 min
+## Paso 3 · Generar la API 
 
 **Data** → fuente `default` → esquema `public` → botón **Track All**.
 
@@ -50,16 +47,15 @@ En total la API expone **42 operaciones** (14 queries y 28 mutations); solo
 
 ---
 
-## Paso 4 · Rastrear las relaciones · 1 min
+## Paso 4 · Rastrear las relaciones 
 
-Vuelve a **Data** → abajo verás **Untracked foreign-key relationships** →
-**Track All**.
+Vuelve a **Data** → abajo verás **Untracked foreign-key relationships** → **Track All**.
 
 ✅ En el Explorer, dentro de `pedidos` ahora existen `cliente` y `pedido_items`.
 
 ---
 
-## Paso 5 · Primera consulta · 4 min
+## Paso 5 · Primera consulta 
 
 Pestaña **API**. Pega y ejecuta:
 
@@ -97,7 +93,7 @@ query {
 
 ---
 
-## Paso 6 · Tres tablas en una sola petición · 5 min
+## Paso 6 · Tres tablas en una sola petición 
 
 ```graphql
 query {
@@ -121,7 +117,7 @@ el pedido 2 es de **Luis Gomez** con *1 x Capuchino* y *2 x Brownie*.
 
 ---
 
-## Paso 7 · Agregados · 2 min
+## Paso 7 · Agregados 
 
 ```graphql
 query {
@@ -266,9 +262,7 @@ columna no existe.
 
 ---
 
-## Cierre · 2 min
-
-Al terminar, tus compañeros deberían poder explicar tres cosas:
+## puntos de aprendizaje
 
 1. De dónde salió la API: del **esquema** de la base de datos.
 2. Por qué una query trae tres tablas: de las **llaves foráneas**.
@@ -276,7 +270,7 @@ Al terminar, tus compañeros deberían poder explicar tres cosas:
 
 ---
 
-## Si sobra tiempo · retos para que ellos resuelvan
+## para seguir jugando con hasura
 
 <details>
 <summary><b>Reto 1.</b> Los postres disponibles, del más caro al más barato.</summary>

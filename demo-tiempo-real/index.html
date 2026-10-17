@@ -144,7 +144,12 @@ function conectar() {
       log("datos recibidos: " + pedidos.length + " pedidos activos");
 
     } else if (msg.type === "error" || msg.type === "connection_error") {
-      log("error: " + JSON.stringify(msg.payload));
+      const txt = JSON.stringify(msg.payload);
+      log("error: " + txt);
+      if (txt.includes("not found in type")) {
+        log("PISTA: ese campo no existe todavia. Falta el Paso 4: consola -> Data -> " +
+            "Untracked foreign-key relationships -> Track All. Luego pulsa Conectar.");
+      }
     }
     // msg.type === "ka" es el keep-alive, se ignora
   };

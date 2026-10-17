@@ -1,0 +1,47 @@
+# Stack del taller: PostgreSQL (datos) + Hasura (API GraphQL automatica)
+# Levantar:  docker compose up -d
+# Consola:   http://localhost:8081/console
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: taller-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: cafeteria
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Los .sql de esta carpeta se ejecutan SOLO la primera vez que se crea el volumen
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"   # host:contenedor (5433 para no chocar con otros proyectos)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cafeteria"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  graphql-engine:
+    image: hasura/graphql-engine:v2.42.0
+    container_name: taller-hasura
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8080"   # host:contenedor (la consola queda en localhost:8081)
+    environment:
+      # Base de datos que Hasura va a leer para generar la API
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/cafeteria
+      # Guarda la metadata (tablas rastreadas, permisos, relaciones) en la misma BD
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/cafeteria
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:-taller123}
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+      HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
+
+volumes:
+  db_data:

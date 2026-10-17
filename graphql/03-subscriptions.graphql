@@ -1,0 +1,49 @@
+# ============================================================
+# SUBSCRIPTIONS (tiempo real por WebSocket)
+# NOTA: el campo "total" requiere el campo calculado del Paso 5 del README.
+# Cambia "query" por "subscription" y ya: Hasura te empuja los
+# datos nuevos cada vez que cambian en Postgres.
+#
+# COMO DEMOSTRARLO EN VIVO:
+#   1. Abre esta subscription en GraphiQL y dejala corriendo.
+#   2. En OTRA pestaña (o en la pestaña Data de la consola)
+#      cambia el estado de un pedido.
+#   3. La primera pestaña se actualiza sola.
+# ============================================================
+
+# 1. Tablero de pedidos activos en vivo
+subscription TableroPedidos {
+  pedidos(
+    where: { estado: { _in: ["pendiente", "preparando", "listo"] } }
+    order_by: { created_at: asc }
+  ) {
+    id
+    estado
+    notas
+    updated_at
+    cliente { nombre }
+    pedido_items {
+      cantidad
+      producto { nombre }
+    }
+  }
+}
+
+# 2. Seguir UN pedido (lo que veria el cliente en su celular)
+subscription MiPedido($pedidoId: Int!) {
+  pedidos_by_pk(id: $pedidoId) {
+    id
+    estado
+    total
+    updated_at
+  }
+}
+# Variables:
+# { "pedidoId": 3 }
+
+# 3. Contador en vivo (ideal para un dashboard)
+subscription PedidosPendientes {
+  pedidos_aggregate(where: { estado: { _eq: "pendiente" } }) {
+    aggregate { count }
+  }
+}

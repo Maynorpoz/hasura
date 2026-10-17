@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablero de pedidos en vivo</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #262b36;
+    --text: #e7e9ee; --muted: #9aa3b2; --accent: #7aa2f7;
+    --pendiente: #f7b955; --preparando: #7aa2f7; --listo: #5ec97a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; max-width: 70ch; }
+  code { background: #0c0e12; padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  .bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; margin-bottom: 18px;
+  }
+  input {
+    background: #0c0e12; border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 7px 10px; font: inherit; font-size: 13px;
+  }
+  button {
+    background: var(--accent); border: 0; color: #0c0e12; font-weight: 600;
+    border-radius: 6px; padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 500; }
+  button:hover { opacity: .88; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #666; display: inline-block; }
+  .dot.on { background: var(--listo); box-shadow: 0 0 8px var(--listo); }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .col { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-height: 140px; }
+  .col h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
+  .col h2 b { color: var(--text); }
+  .card {
+    background: #0c0e12; border: 1px solid var(--line); border-left: 3px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; animation: pop .35s ease;
+  }
+  .card.pendiente  { border-left-color: var(--pendiente); }
+  .card.preparando { border-left-color: var(--preparando); }
+  .card.listo      { border-left-color: var(--listo); }
+  @keyframes pop { from { transform: translateY(-6px); opacity: 0; } }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .card .who { font-weight: 600; }
+  .card .id { color: var(--muted); font-size: 12px; }
+  .card ul { margin: 6px 0 8px; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .card .notas { color: var(--pendiente); font-size: 12px; margin-bottom: 8px; }
+  .log {
+    margin-top: 18px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px; color: var(--muted); max-height: 170px; overflow: auto;
+  }
+  .empty { color: #5a6273; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Tablero de pedidos en vivo</h1>
+<p class="sub">
+  Una sola <code>subscription</code> de GraphQL sobre WebSocket. Cero backend propio:
+  este archivo HTML habla directo con Hasura. Cambia el estado de un pedido en la consola
+  y esta pantalla se actualiza sola.
+</p>
+
+<div class="bar">
+  <span class="dot" id="dot"></span>
+  <span id="estado">desconectado</span>
+  <input id="url" value="ws://localhost:8081/v1/graphql" size="30">
+  <input id="secret" value="taller123" size="12" placeholder="admin secret">
+  <button id="conectar">Conectar</button>
+  <button class="ghost" id="nuevo">Crear pedido de prueba</button>
+</div>
+
+<div class="cols">
+  <div class="col"><h2><b>Pendiente</b> <span id="c-pendiente"></span></h2><div id="pendiente"></div></div>
+  <div class="col"><h2><b>Preparando</b> <span id="c-preparando"></span></h2><div id="preparando"></div></div>
+  <div class="col"><h2><b>Listo</b> <span id="c-listo"></span></h2><div id="listo"></div></div>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+// La MISMA subscription del archivo graphql/03-subscriptions.graphql
+const SUB = `
+subscription TableroPedidos {
+  pedidos(where: {estado: {_in: ["pendiente","preparando","listo"]}}, order_by: {created_at: asc}) {
+    id
+    estado
+    notas
+    cliente { nombre }
+    pedido_items { cantidad producto { nombre } }
+  }
+}`;
+
+const ESTADOS = ["pendiente", "preparando", "listo"];
+const SIGUIENTE = { pendiente: "preparando", preparando: "listo", listo: "entregado" };
+
+let ws = null;
+
+const $ = (id) => document.getElementById(id);
+
+function log(msg) {
+  const t = new Date().toLocaleTimeString();
+  $("log").insertAdjacentHTML("afterbegin", "<div>[" + t + "] " + msg + "</div>");
+}
+
+const httpUrl = () => $("url").value.replace(/^ws/, "http");
+
+// ---------- Tiempo real: WebSocket con el protocolo nativo de Hasura ----------
+function conectar() {
+  if (ws) ws.close();
+  ws = new WebSocket($("url").value, "graphql-ws");
+
+  ws.onopen = function () {
+    // 1) Handshake: aqui van los headers de autenticacion
+    ws.send(JSON.stringify({
+      type: "connection_init",
+      payload: { headers: { "x-hasura-admin-secret": $("secret").value } }
+    }));
+  };
+
+  ws.onmessage = function (ev) {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === "connection_ack") {
+      $("dot").classList.add("on");
+      $("estado").textContent = "conectado";
+      log("Hasura acepto la conexion, enviando subscription");
+      // 2) Nos suscribimos una sola vez
+      ws.send(JSON.stringify({ id: "1", type: "start", payload: { query: SUB } }));
+
+    } else if (msg.type === "data") {
+      // 3) Hasura nos empuja los datos cada vez que cambian en Postgres
+      const pedidos = msg.payload.data.pedidos;
+      pintar(pedidos);
+      log("datos recibidos: " + pedidos.length + " pedidos activos");
+
+    } else if (msg.type === "error" || msg.type === "connection_error") {
+      log("error: " + JSON.stringify(msg.payload));
+    }
+    // msg.type === "ka" es el keep-alive, se ignora
+  };
+
+  ws.onclose = function () {
+    $("dot").classList.remove("on");
+    $("estado").textContent = "desconectado";
+    log("conexion cerrada");
+  };
+
+  ws.onerror = function () {
+    log("no se pudo conectar: revisa que el stack este arriba (docker compose ps)");
+  };
+}
+
+// ---------- Render ----------
+function pintar(pedidos) {
+  ESTADOS.forEach(function (e) {
+    const lista = pedidos.filter(function (p) { return p.estado === e; });
+    $("c-" + e).textContent = lista.length;
+    $(e).innerHTML = lista.length
+      ? lista.map(tarjeta).join("")
+      : '<p class="empty">Nada por aqui</p>';
+  });
+}
+
+function tarjeta(p) {
+  const items = p.pedido_items.map(function (i) {
+    return "<li>" + i.cantidad + " x " + i.producto.nombre + "</li>";
+  }).join("");
+
+  return '<div class="card ' + p.estado + '">' +
+    '<div class="top"><span class="who">' + p.cliente.nombre + '</span>' +
+    '<span class="id">#' + p.id + '</span></div>' +
+    "<ul>" + items + "</ul>" +
+    (p.notas ? '<div class="notas">Nota: ' + p.notas + "</div>" : "") +
+    '<button class="ghost" onclick="avanzar(' + p.id + ", '" + SIGUIENTE[p.estado] + "')\">" +
+    "pasar a " + SIGUIENTE[p.estado] + "</button>" +
+    "</div>";
+}
+
+// ---------- Mutations por HTTP: la misma API, otro transporte ----------
+async function gql(query, variables) {
+  const res = await fetch(httpUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-hasura-admin-secret": $("secret").value
+    },
+    body: JSON.stringify({ query: query, variables: variables })
+  });
+  const json = await res.json();
+  if (json.errors) log("error: " + json.errors[0].message);
+  return json;
+}
+
+window.avanzar = function (id, estado) {
+  log("mutation: pedido #" + id + " -> " + estado);
+  gql(
+    "mutation($id:Int!, $estado:String!) {" +
+    "  update_pedidos_by_pk(pk_columns:{id:$id}, _set:{estado:$estado}) { id estado }" +
+    "}",
+    { id: id, estado: estado }
+  );
+};
+
+$("nuevo").onclick = function () {
+  log("mutation: creando pedido de prueba (insert anidado)");
+  gql(
+    "mutation {" +
+    "  insert_pedidos_one(object: {" +
+    '    cliente_id: 1, notas: "Pedido de la demo",' +
+    "    pedido_items: { data: [{ producto_id: 2, cantidad: 1, precio_unitario: 5200 }] }" +
+    "  }) { id }" +
+    "}"
+  );
+};
+
+$("conectar").onclick = conectar;
+conectar();
+</script>
+</body>
+</html>

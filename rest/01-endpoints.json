@@ -1,0 +1,14 @@
+{
+ "comentario": "Coleccion de queries + 4 endpoints REST de PRACTICA-REST.md. Requiere relaciones rastreadas (Paso 3b) y el campo calculado total (Paso 5).",
+ "type":"bulk","args":[
+ {"type":"create_query_collection","args":{"name":"allowed-queries","definition":{"queries":[
+   {"name":"MenuDisponible","query":"query MenuDisponible { productos(where: {disponible: {_eq: true}}, order_by: {categoria: asc}) { id nombre categoria precio } }"},
+   {"name":"PedidoPorId","query":"query PedidoPorId($id: Int!) { pedidos_by_pk(id: $id) { id estado total cliente { nombre } pedido_items { cantidad producto { nombre } } } }"},
+   {"name":"ProductosPorCategoria","query":"query ProductosPorCategoria($categoria: String!, $maximo: numeric!) { productos(where: {categoria: {_eq: $categoria}, precio: {_lte: $maximo}}, order_by: {precio: asc}) { nombre precio } }"},
+   {"name":"CrearPedido","query":"mutation CrearPedido($clienteId: Int!, $productoId: Int!, $cantidad: Int!, $precio: numeric!) { insert_pedidos_one(object: {cliente_id: $clienteId, pedido_items: {data: [{producto_id: $productoId, cantidad: $cantidad, precio_unitario: $precio}]}}) { id estado total } }"}
+ ]}}},
+ {"type":"create_rest_endpoint","args":{"name":"menu","url":"menu","methods":["GET"],"definition":{"query":{"collection_name":"allowed-queries","query_name":"MenuDisponible"}},"comment":"Menu de productos disponibles"}},
+ {"type":"create_rest_endpoint","args":{"name":"pedido por id","url":"pedidos/:id","methods":["GET"],"definition":{"query":{"collection_name":"allowed-queries","query_name":"PedidoPorId"}},"comment":"Un pedido con su detalle"}},
+ {"type":"create_rest_endpoint","args":{"name":"productos por categoria","url":"productos","methods":["GET"],"definition":{"query":{"collection_name":"allowed-queries","query_name":"ProductosPorCategoria"}},"comment":"Filtra por categoria y precio maximo"}},
+ {"type":"create_rest_endpoint","args":{"name":"crear pedido","url":"pedidos","methods":["POST"],"definition":{"query":{"collection_name":"allowed-queries","query_name":"CrearPedido"}},"comment":"Crea un pedido con un item"}}
+]}

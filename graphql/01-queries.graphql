@@ -1,0 +1,130 @@
+# ============================================================
+# QUERIES (leer datos)
+# NOTA: el campo "total" requiere el campo calculado del Paso 5 del README.
+# Pegar en GraphiQL: http://localhost:8081/console -> API
+# Ejecutar de una en una (clic en la flecha ▶ y elegir la query)
+# ============================================================
+
+# 1. Lo mas basico: pedir SOLO los campos que necesito.
+#    Comparalo con un GET /productos de REST, que devuelve todo.
+query ProductosMinimo {
+  productos {
+    nombre
+    precio
+  }
+}
+
+# 2. Filtros, orden y paginacion (todo generado por Hasura)
+query BebidasBaratas {
+  productos(
+    where: { categoria: { _eq: "bebida" }, precio: { _lt: 6000 }, disponible: { _eq: true } }
+    order_by: { precio: asc }
+    limit: 5
+  ) {
+    id
+    nombre
+    precio
+  }
+}
+
+# 3. Busqueda por texto + operador OR
+query BuscarProducto {
+  productos(
+    where: {
+      _or: [
+        { nombre: { _ilike: "%cafe%" } }
+        { nombre: { _ilike: "%latte%" } }
+      ]
+    }
+  ) {
+    nombre
+    categoria
+    precio
+  }
+}
+
+# 4. RELACIONES ANIDADAS: tres tablas en UNA sola peticion.
+#    Hasura las deduce de las llaves foraneas.
+#    En REST esto serian 3 llamadas (o un endpoint hecho a mano).
+query PedidosConDetalle {
+  pedidos(order_by: { created_at: desc }) {
+    id
+    estado
+    created_at
+    cliente {
+      nombre
+      email
+    }
+    pedido_items {
+      cantidad
+      precio_unitario
+      producto {
+        nombre
+        categoria
+      }
+    }
+  }
+}
+
+# 5. Campo calculado (la funcion SQL pedido_total expuesta como "total")
+query PedidosConTotal {
+  pedidos(order_by: { id: asc }) {
+    id
+    estado
+    total
+    cliente {
+      nombre
+    }
+  }
+}
+
+# 6. AGREGADOS: contar, sumar, promediar sin escribir SQL
+query Estadisticas {
+  productos_aggregate {
+    aggregate {
+      count
+      avg { precio }
+      max { precio }
+      min { precio }
+    }
+  }
+  pedidos_aggregate(where: { estado: { _eq: "pendiente" } }) {
+    aggregate {
+      count
+    }
+  }
+}
+
+# 7. Agregado anidado: cuantos items tiene cada pedido
+query ItemsPorPedido {
+  pedidos {
+    id
+    estado
+    pedido_items_aggregate {
+      aggregate {
+        count
+        sum { cantidad }
+      }
+    }
+  }
+}
+
+# 8. Una VISTA de Postgres expuesta como tabla
+query MasVendidos {
+  productos_mas_vendidos(order_by: { unidades_vendidas: desc }, limit: 5) {
+    nombre
+    unidades_vendidas
+    ingresos
+  }
+}
+
+# 9. Variables (asi se consume desde una app real)
+query PedidosDeCliente($clienteId: Int!) {
+  pedidos(where: { cliente_id: { _eq: $clienteId } }) {
+    id
+    estado
+    total
+  }
+}
+# Variables (panel inferior de GraphiQL):
+# { "clienteId": 1 }

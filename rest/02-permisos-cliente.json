@@ -1,0 +1,22 @@
+{
+  "comentario": "Permisos de select para el rol 'cliente' (Ejercicio 6 de PRACTICA-REST.md). Requiere que las relaciones esten rastreadas (Paso 3b del README).",
+  "type": "bulk",
+  "args": [
+    { "type": "pg_create_select_permission",
+      "args": { "source": "default", "table": { "schema": "public", "name": "pedidos" }, "role": "cliente",
+                "permission": { "columns": ["id","estado","notas","created_at"],
+                                "computed_fields": ["total"],
+                                "filter": { "cliente_id": { "_eq": "X-Hasura-User-Id" } } } } },
+    { "type": "pg_create_select_permission",
+      "args": { "source": "default", "table": { "schema": "public", "name": "clientes" }, "role": "cliente",
+                "permission": { "columns": ["id","nombre","email"],
+                                "filter": { "id": { "_eq": "X-Hasura-User-Id" } } } } },
+    { "type": "pg_create_select_permission",
+      "args": { "source": "default", "table": { "schema": "public", "name": "pedido_items" }, "role": "cliente",
+                "permission": { "columns": ["id","cantidad","precio_unitario","producto_id"],
+                                "filter": { "pedido": { "cliente_id": { "_eq": "X-Hasura-User-Id" } } } } } },
+    { "type": "pg_create_select_permission",
+      "args": { "source": "default", "table": { "schema": "public", "name": "productos" }, "role": "cliente",
+                "permission": { "columns": ["id","nombre","categoria","precio","disponible"], "filter": {} } } }
+  ]
+}

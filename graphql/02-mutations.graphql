@@ -1,0 +1,102 @@
+# ============================================================
+# MUTATIONS (escribir datos: insert / update / delete)
+# NOTA: el campo "total" requiere el campo calculado del Paso 5 del README.
+# ============================================================
+
+# 1. INSERT simple
+mutation CrearCliente {
+  insert_clientes_one(object: {
+    nombre: "Pedro Ramirez"
+    email: "pedro@uni.edu"
+  }) {
+    id
+    nombre
+    created_at
+  }
+}
+
+# 2. INSERT ANIDADO: el pedido y sus items en UNA transaccion.
+#    Esto es lo que normalmente costaria un controlador entero
+#    con manejo manual de transacciones.
+mutation CrearPedidoCompleto {
+  insert_pedidos_one(object: {
+    cliente_id: 2
+    notas: "Extra caliente"
+    pedido_items: {
+      data: [
+        { producto_id: 1, cantidad: 2, precio_unitario: 3500 }
+        { producto_id: 7, cantidad: 1, precio_unitario: 4800 }
+      ]
+    }
+  }) {
+    id
+    estado
+    total
+    cliente { nombre }
+    pedido_items {
+      cantidad
+      producto { nombre }
+    }
+  }
+}
+
+# 3. UPDATE por llave primaria (usalo durante la demo de subscriptions)
+mutation AvanzarPedido {
+  update_pedidos_by_pk(
+    pk_columns: { id: 3 }
+    _set: { estado: "preparando" }
+  ) {
+    id
+    estado
+    updated_at
+  }
+}
+
+# 4. UPDATE masivo con filtro
+mutation SubirPrecioBebidas {
+  update_productos(
+    where: { categoria: { _eq: "bebida" } }
+    _inc: { precio: 500 }
+  ) {
+    affected_rows
+    returning {
+      nombre
+      precio
+    }
+  }
+}
+
+# 5. UPSERT (insertar o actualizar si el email ya existe)
+mutation UpsertCliente {
+  insert_clientes_one(
+    object: { nombre: "Ana Torres Lopez", email: "ana@uni.edu" }
+    on_conflict: { constraint: clientes_email_key, update_columns: [nombre] }
+  ) {
+    id
+    nombre
+  }
+}
+
+# 6. DELETE
+mutation CancelarYBorrar {
+  delete_pedidos(where: { estado: { _eq: "cancelado" } }) {
+    affected_rows
+  }
+}
+
+# 7. Varias mutations en una sola peticion (se ejecutan en orden,
+#    en una misma transaccion)
+mutation DosCosasALaVez {
+  nuevoProducto: insert_productos_one(object: {
+    nombre: "Te chai", categoria: "bebida", precio: 4900
+  }) {
+    id
+    nombre
+  }
+  agotarEnsalada: update_productos(
+    where: { nombre: { _eq: "Ensalada cesar" } }
+    _set: { disponible: false }
+  ) {
+    affected_rows
+  }
+}
